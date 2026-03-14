@@ -12,7 +12,12 @@
     "type": "git",
     "url": "git+https://github.com/Sai-Phani-Krishna8/Finsheild.git"
   },
-  "keywords": ["pan-card", "fraud-detection", "fintech", "india"],
+  "keywords": [
+    "pan-card",
+    "fraud-detection",
+    "fintech",
+    "india"
+  ],
   "author": "FinShield",
   "license": "ISC",
   "type": "commonjs",
@@ -23,6 +28,7 @@
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
     "morgan": "^1.10.1"
   },

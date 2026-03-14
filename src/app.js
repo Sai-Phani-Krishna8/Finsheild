@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const pancardRouter = require('./routes/pancard');
 
@@ -34,6 +35,17 @@ app.use(express.urlencoded({ extended: false }));
 
 // ── Request logging ───────────────────────────────────────────────────────────
 app.use(morgan('dev'));
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+});
+
+app.use('/api/', apiLimiter);
 
 // ── Static frontend files ─────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'public')));
