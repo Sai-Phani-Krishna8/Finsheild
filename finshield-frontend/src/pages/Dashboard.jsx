@@ -1,267 +1,263 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { mockActivities, simulatedAlerts, getStatusCounts } from '../data/mockActivities.js'
+import { mockActivities, simulatedAlerts, getStatusCounts } from '../data/mockActivities'
 
-// ── Web Audio beep (no file needed) ──────────────────────
 function playAlertBeep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const oscillator = ctx.createOscillator()
-    const gainNode = ctx.createGain()
-    oscillator.connect(gainNode)
-    gainNode.connect(ctx.destination)
-    oscillator.type = 'sine'
-    oscillator.frequency.setValueAtTime(880, ctx.currentTime)
-    oscillator.frequency.setValueAtTime(660, ctx.currentTime + 0.1)
-    gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-    oscillator.start(ctx.currentTime)
-    oscillator.stop(ctx.currentTime + 0.4)
-  } catch (e) {
-    // silently fail if audio not supported
-  }
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1)
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4)
+  } catch (e) {}
 }
 
-// ── Browser push notification ─────────────────────────────
 function sendBrowserNotification(activity) {
   if (!('Notification' in window)) return
   if (Notification.permission === 'granted') {
     new Notification('🔴 FinShield Alert', {
       body: `${activity.type}: ${activity.description.slice(0, 80)}...`,
-      icon: '/vite.svg',
     })
   }
 }
 
-// ── Status badge pill ─────────────────────────────────────
-function StatusBadge({ status }) {
+const typeIcons = {
+  'Company Registration': '🏢', 'Loan Inquiry': '💳',
+  'ITR Filing': '📋', 'GST Registration': '🧾',
+  'KYC Verification': '🔐', 'Credit Card Application': '💳',
+  'Aadhaar-PAN Link': '🔗', 'Property Registration': '🏠',
+  'Mutual Fund KYC': '📈', 'Bank Account Opening': '🏦',
+}
+
+function StatCard({ label, value, color, icon, sub, topColor }) {
   return (
-    <span className={`
-      text-xs font-bold px-2.5 py-1 rounded-full
-      ${status === 'SUSPICIOUS'
-        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-      }
-    `}>
-      {status}
-    </span>
+    <div
+      className="stat-card"
+      style={{
+        flex: 1, background: 'rgba(255,255,255,0.02)',
+        border: '1px solid #0a2a1a', borderRadius: '14px',
+        padding: '16px 18px', position: 'relative', overflow: 'hidden',
+      }}
+    >
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: topColor, boxShadow: `0 0 10px ${topColor}` }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color }}>
+          {label}
+        </span>
+        <span
+          className="stat-icon-box"
+          style={{
+            width: '30px', height: '30px', borderRadius: '8px',
+            background: `${topColor}12`, border: `1px solid ${topColor}25`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '14px', transition: 'transform 0.25s',
+          }}
+        >{icon}</span>
+      </div>
+      <p style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '32px', fontWeight: 900, color, textShadow: `0 0 14px ${topColor}60`, lineHeight: 1 }}>
+        {value}
+      </p>
+      <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '11px', color, opacity: 0.5, marginTop: '5px' }}>{sub}</p>
+    </div>
   )
 }
 
-// ── Type badge ────────────────────────────────────────────
-function TypeBadge({ type }) {
-  return (
-    <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-700 text-slate-300">
-      {type}
-    </span>
-  )
-}
-
-// ── Single activity card ──────────────────────────────────
 function ActivityCard({ activity, isNew }) {
   const isSuspicious = activity.status === 'SUSPICIOUS'
+  const icon = typeIcons[activity.type] || '📌'
+  const color = isSuspicious ? '#ff4444' : '#00ff88'
+
   return (
-    <div className={`
-      bg-slate-900 rounded-xl border border-slate-700 p-4
-      border-l-4 transition-all duration-300
-      ${isSuspicious ? 'border-l-red-500' : 'border-l-emerald-500'}
-      ${isNew ? 'animate-slide-in' : ''}
-    `}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-2">
-            <TypeBadge type={activity.type} />
-            {isNew && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-600 text-white animate-pulse">
-                NEW
-              </span>
-            )}
-          </div>
-          <p className="text-white text-sm leading-relaxed mb-2">
-            {activity.description}
-          </p>
-          <div className="flex items-center gap-3 text-xs text-slate-500">
-            <span>📍 {activity.source}</span>
-            <span>🕐 {activity.timestamp}</span>
-          </div>
+    <div
+      className={`activity-card ${isSuspicious ? 'suspicious-card' : 'normal-card'} ${isNew ? 'animate-slide-in' : ''}`}
+      style={{
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid #0a2a1a`,
+        borderLeft: `2px solid ${color}`,
+        borderTopLeftRadius: 0, borderBottomLeftRadius: 0,
+        borderTopRightRadius: '14px', borderBottomRightRadius: '14px',
+        padding: '16px 18px',
+        display: 'flex', alignItems: 'flex-start', gap: '14px',
+      }}
+    >
+      <div
+        className="card-icon-box"
+        style={{
+          width: '38px', height: '38px', borderRadius: '10px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '16px', flexShrink: 0,
+          background: isSuspicious ? 'rgba(255,68,68,0.08)' : 'rgba(0,255,136,0.06)',
+          border: `1px solid ${isSuspicious ? 'rgba(255,68,68,0.25)' : 'rgba(0,255,136,0.25)'}`,
+          transition: 'transform 0.25s',
+        }}
+      >{icon}</div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px', flexWrap: 'wrap' }}>
+          <span
+            className="type-badge"
+            style={{
+              fontFamily: "'Rajdhani',sans-serif", fontSize: '11px', fontWeight: 700,
+              color: '#2d6a4f', background: 'rgba(0,255,136,0.04)',
+              padding: '3px 10px', borderRadius: '5px',
+              border: '1px solid #0a2a1a', letterSpacing: '0.05em',
+              transition: 'all 0.25s',
+            }}
+          >{activity.type.toUpperCase()}</span>
+          {isNew && (
+            <span style={{
+              fontFamily: "'Rajdhani',sans-serif", fontSize: '10px', fontWeight: 700,
+              color: '#00ff88', background: 'rgba(0,255,136,0.08)',
+              padding: '3px 9px', borderRadius: '5px',
+              border: '1px solid rgba(0,255,136,0.35)',
+              letterSpacing: '0.06em', animation: 'blink 2s infinite',
+            }}>● NEW</span>
+          )}
         </div>
-        <div className="flex-shrink-0">
-          <StatusBadge status={activity.status} />
+        <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '13px', color: '#52b788', lineHeight: 1.6, marginBottom: '7px' }}>
+          {activity.description}
+        </p>
+        <div style={{ display: 'flex', gap: '16px', fontFamily: "'Inter',sans-serif", fontSize: '11px', color: '#1a4d2e', fontWeight: 500 }}>
+          <span>📍 {activity.source}</span>
+          <span>🕐 {activity.timestamp}</span>
         </div>
       </div>
+
+      <span style={{
+        fontFamily: "'Rajdhani',sans-serif", fontSize: '11px', fontWeight: 700,
+        padding: '4px 12px', borderRadius: '20px', flexShrink: 0,
+        letterSpacing: '0.08em', marginTop: '2px',
+        background: isSuspicious ? 'rgba(255,68,68,0.08)' : 'rgba(0,255,136,0.06)',
+        color: isSuspicious ? '#ff6b6b' : '#00ff88',
+        border: `1px solid ${isSuspicious ? 'rgba(255,68,68,0.25)' : 'rgba(0,255,136,0.25)'}`,
+      }}>{activity.status}</span>
     </div>
   )
 }
 
-// ── Stat card ─────────────────────────────────────────────
-function StatCard({ label, value, color }) {
-  return (
-    <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 flex-1 min-w-0">
-      <p className="text-slate-400 text-xs mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-    </div>
-  )
-}
-
-// ── Main Dashboard ────────────────────────────────────────
 export default function Dashboard() {
-  const [activities, setActivities] = useState(
-    mockActivities.map(a => ({ ...a, isNew: false }))
-  )
+  const [activities, setActivities] = useState(mockActivities.map(a => ({ ...a, isNew: false })))
+  const [monitorSeconds, setMonitorSeconds] = useState(0)
+  const [isPolling, setIsPolling] = useState(true)
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   )
-  const [monitorSeconds, setMonitorSeconds] = useState(0)
-  const [isPolling, setIsPolling] = useState(true)
   const alertIndexRef = useRef(0)
   const nextId = useRef(mockActivities.length + 1)
 
-  // ── Request browser notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(perm => {
-        setNotifPermission(perm)
-      })
+      Notification.requestPermission().then(p => setNotifPermission(p))
     }
   }, [])
 
-  // ── Monitoring timer
   useEffect(() => {
-    const timer = setInterval(() => {
-      setMonitorSeconds(s => s + 1)
-    }, 1000)
-    return () => clearInterval(timer)
+    const t = setInterval(() => setMonitorSeconds(s => s + 1), 1000)
+    return () => clearInterval(t)
   }, [])
 
-  // ── Format timer display
-  const formatTime = (secs) => {
-    const h = String(Math.floor(secs / 3600)).padStart(2, '0')
-    const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0')
-    const s = String(secs % 60).padStart(2, '0')
-    return `${h}:${m}:${s}`
+  const formatTime = (s) => {
+    const h = String(Math.floor(s / 3600)).padStart(2, '0')
+    const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+    const sec = String(s % 60).padStart(2, '0')
+    return `${h}:${m}:${sec}`
   }
 
-  // ── Add a new alert card
-  const addAlert = useCallback((auto = false) => {
+  const addAlert = useCallback(() => {
     const alert = simulatedAlerts[alertIndexRef.current % simulatedAlerts.length]
     alertIndexRef.current += 1
-
     const newActivity = {
-      ...alert,
-      id: nextId.current++,
-      timestamp: new Date().toLocaleString('en-IN', {
-        day: '2-digit', month: 'short',
-        hour: '2-digit', minute: '2-digit',
-      }),
-      isNew: true,
+      ...alert, id: nextId.current++, isNew: true,
+      timestamp: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
     }
-
     setActivities(prev => [newActivity, ...prev])
-
-    // Play beep
     playAlertBeep()
-
-    // Browser notification
     sendBrowserNotification(newActivity)
-
-    // Toast
     if (newActivity.status === 'SUSPICIOUS') {
-      toast.error(`🔴 ${newActivity.type} — ${newActivity.source}`, {
-        duration: 5000,
-      })
+      toast.error(`🔴 ${newActivity.type} — ${newActivity.source}`, { duration: 5000 })
     } else {
-      toast.success(`🟢 ${newActivity.type} — ${newActivity.source}`, {
-        duration: 3000,
-      })
+      toast.success(`🟢 ${newActivity.type} — ${newActivity.source}`, { duration: 3000 })
     }
-
-    // Remove NEW badge after 4 seconds
     setTimeout(() => {
-      setActivities(prev =>
-        prev.map(a => a.id === newActivity.id ? { ...a, isNew: false } : a)
-      )
+      setActivities(prev => prev.map(a => a.id === newActivity.id ? { ...a, isNew: false } : a))
     }, 4000)
   }, [])
 
-  // ── Auto-polling every 30 seconds
   useEffect(() => {
     if (!isPolling) return
-    const interval = setInterval(() => {
-      addAlert(true)
-    }, 30000)
+    const interval = setInterval(() => addAlert(), 30000)
     return () => clearInterval(interval)
   }, [isPolling, addAlert])
 
   const counts = getStatusCounts(activities)
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
 
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h1 className="text-white text-2xl font-bold">Live PAN Activity Feed</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Real-time monitoring of your PAN card usage across financial systems
+          <h1 style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '18px', fontWeight: 900, color: '#fff', letterSpacing: '2px', textTransform: 'uppercase', textShadow: '0 0 20px rgba(0,255,136,0.2)' }}>
+            Live PAN Activity
+          </h1>
+          <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#2d6a4f', marginTop: '5px' }}>
+            Real-time monitoring across all financial systems in India
           </p>
         </div>
-
-        {/* Monitoring badge */}
-        <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-emerald-400 text-sm font-medium">
-            Monitoring {formatTime(monitorSeconds)}
+        <div
+          className="monitor-pill-hover"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'rgba(0,255,136,0.05)',
+            border: '1px solid rgba(0,255,136,0.2)',
+            borderRadius: '20px', padding: '8px 16px',
+            boxShadow: '0 0 12px rgba(0,255,136,0.08)',
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff88', boxShadow: '0 0 10px #00ff88', animation: 'blink 1.5s infinite', display: 'inline-block' }} />
+          <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: '13px', color: '#00ff88', fontWeight: 700, letterSpacing: '0.06em' }}>
+            MONITORING {formatTime(monitorSeconds)}
           </span>
         </div>
       </div>
 
-      {/* Notification permission warning */}
+      {/* Notification warning */}
       {notifPermission === 'denied' && (
-        <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-amber-400 text-sm">
-          ⚠️ Browser notifications are blocked. Enable them in browser settings to receive alerts.
+        <div style={{ marginBottom: '16px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '12px 16px' }}>
+          <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#fbbf24' }}>
+            ⚠️ Browser notifications blocked. Enable in browser settings to receive alerts.
+          </p>
         </div>
       )}
 
-      {/* Stat bar */}
-      <div className="flex gap-3 mb-6">
-        <StatCard label="Total Events"    value={counts.total}      color="text-white" />
-        <StatCard label="Suspicious"      value={counts.suspicious} color="text-red-400" />
-        <StatCard label="Normal"          value={counts.normal}     color="text-emerald-400" />
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <StatCard label="Total Events"  value={counts.total}      color="#00ff88" icon="📊" sub="↑ 2 new today"    topColor="#00ff88" />
+        <StatCard label="Suspicious"    value={counts.suspicious} color="#ff6b6b" icon="🚨" sub="Needs attention"  topColor="#ff4444" />
+        <StatCard label="Normal"        value={counts.normal}     color="#00ccff" icon="✅" sub="Verified safe"    topColor="#00ccff" />
       </div>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <button
-          onClick={() => addAlert(false)}
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2"
-        >
-          <span>⚡</span> Simulate Live Alert
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <button onClick={() => addAlert()} className="btn-neon-red" style={{ padding: '10px 20px', borderRadius: '9px' }}>
+          ⚡ SIMULATE LIVE ALERT
         </button>
-
-        <button
-          onClick={() => setIsPolling(p => !p)}
-          className={`font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2 border
-            ${isPolling
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-              : 'bg-slate-800 border-slate-600 text-slate-400 hover:bg-slate-700'
-            }`}
-        >
-          <span>{isPolling ? '🟢' : '⏸️'}</span>
-          {isPolling ? 'Auto-polling ON' : 'Auto-polling OFF'}
+        <button onClick={() => setIsPolling(p => !p)} className="btn-neon-green" style={{ padding: '10px 20px', borderRadius: '9px' }}>
+          {isPolling ? '● AUTO-POLLING ON' : '○ AUTO-POLLING OFF'}
         </button>
       </div>
 
-      {/* Activity cards */}
-      <div className="flex flex-col gap-3">
+      {/* Cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {activities.map(activity => (
-          <ActivityCard
-            key={activity.id}
-            activity={activity}
-            isNew={activity.isNew}
-          />
+          <ActivityCard key={activity.id} activity={activity} isNew={activity.isNew} />
         ))}
       </div>
-
     </div>
   )
 }

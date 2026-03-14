@@ -3,78 +3,43 @@ import toast from 'react-hot-toast'
 import api from '../api/axios'
 import { mockActivities } from '../data/mockActivities'
 
-function getGaugeColor(score) {
-  if (score <= 40) return '#10b981'
+function getColor(score) {
+  if (score <= 40) return '#00ff88'
   if (score <= 70) return '#f59e0b'
-  if (score <= 85) return '#ef4444'
-  return '#7f1d1d'
-}
-
-function getLevelColor(level) {
-  switch (level) {
-    case 'LOW':      return 'text-emerald-400'
-    case 'MEDIUM':   return 'text-amber-400'
-    case 'HIGH':     return 'text-red-400'
-    case 'CRITICAL': return 'text-red-600'
-    default:         return 'text-white'
-  }
-}
-
-function getLevelBg(level) {
-  switch (level) {
-    case 'LOW':      return 'bg-emerald-500/20 border-emerald-500/30'
-    case 'MEDIUM':   return 'bg-amber-500/20 border-amber-500/30'
-    case 'HIGH':     return 'bg-red-500/20 border-red-500/30'
-    case 'CRITICAL': return 'bg-red-900/40 border-red-700/50'
-    default:         return 'bg-slate-700 border-slate-600'
-  }
+  if (score <= 85) return '#ff4444'
+  return '#ff0000'
 }
 
 function RiskGauge({ score, level }) {
-  const radius = 80
-  const circumference = 2 * Math.PI * radius
-  const progress = (score / 100) * circumference
-  const color = getGaugeColor(score)
-
+  const r = 80
+  const circ = 2 * Math.PI * r
+  const color = getColor(score)
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative">
-        <svg width="200" height="200" className="transform -rotate-90">
-          <circle
-            cx="100"
-            cy="100"
-            r={radius}
-            fill="none"
-            stroke="#1e293b"
-            strokeWidth="16"
-          />
-          <circle
-            cx="100"
-            cy="100"
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth="16"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference - progress}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ position: 'relative' }}>
+        <svg width="200" height="200" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="100" cy="100" r={r} fill="none" stroke="#0a2a1a" strokeWidth="14" />
+          <circle cx="100" cy="100" r={r} fill="none" stroke={color} strokeWidth="14"
+            strokeDasharray={circ} strokeDashoffset={circ - (score / 100) * circ}
             strokeLinecap="round"
-            style={{
-              transition: 'stroke-dashoffset 1.5s ease-in-out, stroke 0.5s ease',
-            }}
+            style={{ transition: 'stroke-dashoffset 1.5s ease-in-out', filter: `drop-shadow(0 0 8px ${color})` }}
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-5xl font-bold" style={{ color }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '42px', fontWeight: 900, color, textShadow: `0 0 20px ${color}80`, lineHeight: 1 }}>
             {score}
           </span>
-          <span className="text-slate-400 text-sm">/100</span>
+          <span style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#2d6a4f', marginTop: '2px' }}>/100</span>
         </div>
       </div>
-      <div className={`
-        mt-3 px-5 py-1.5 rounded-full border text-sm font-bold
-        ${getLevelBg(level)} ${getLevelColor(level)}
-      `}>
-        {level} RISK
+      <div style={{
+        marginTop: '12px', padding: '5px 20px', borderRadius: '20px',
+        border: `1px solid ${color}40`, background: `${color}10`,
+        boxShadow: `0 0 12px ${color}20`,
+      }}>
+        <span style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: '14px', fontWeight: 700, color, letterSpacing: '0.1em' }}>
+          {level} RISK
+        </span>
       </div>
     </div>
   )
@@ -86,153 +51,148 @@ export default function Risk() {
   const [animatedScore, setAnimatedScore] = useState(0)
   const [error, setError] = useState(null)
 
-  const animateScore = (targetScore) => {
+  const animateScore = (target) => {
     let current = 0
-    const step = targetScore / 60
+    const step = target / 60
     const timer = setInterval(() => {
       current += step
-      if (current >= targetScore) {
-        current = targetScore
-        clearInterval(timer)
-      }
+      if (current >= target) { current = target; clearInterval(timer) }
       setAnimatedScore(Math.round(current))
     }, 25)
   }
 
   const handleAnalyze = async () => {
-    setLoading(true)
-    setResult(null)
-    setAnimatedScore(0)
-    setError(null)
-
+    setLoading(true); setResult(null); setAnimatedScore(0); setError(null)
     try {
-      const response = await api.post('/api/risk/analyze', {
-        activities: mockActivities,
-      })
-      setResult(response.data)
-      animateScore(response.data.score)
+      const res = await api.post('/api/risk/analyze', { activities: mockActivities })
+      setResult(res.data)
+      animateScore(res.data.score)
       toast.success('✅ Risk analysis complete!', { duration: 3000 })
-    } catch (err) {
-      console.error(err)
-      setError('Failed to connect to AI. Make sure backend is running on port 5000.')
-      toast.error('❌ Analysis failed. Check backend.', { duration: 4000 })
+    } catch {
+      setError('Failed to connect. Make sure backend is running on port 5000.')
+      toast.error('❌ Analysis failed.', { duration: 4000 })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleReset = () => {
-    setResult(null)
-    setAnimatedScore(0)
-    setError(null)
-  }
-
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
 
-      <div className="mb-8">
-        <h1 className="text-white text-2xl font-bold">AI Risk Score</h1>
-        <p className="text-slate-400 text-sm mt-0.5">
-          Groq AI analyzes your PAN activity pattern and calculates your fraud risk
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '18px', fontWeight: 900, color: '#fff', letterSpacing: '2px', textTransform: 'uppercase', textShadow: '0 0 20px rgba(0,255,136,0.2)' }}>
+          AI Risk Score
+        </h1>
+        <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#2d6a4f', marginTop: '5px' }}>
+          Groq AI analyzes your PAN activity pattern and calculates fraud risk
         </p>
       </div>
 
       {!result && !loading && (
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="w-20 h-20 rounded-full bg-indigo-600/20 border-2 border-indigo-500/30 flex items-center justify-center text-4xl mb-4">
-              🧠
-            </div>
-            <h2 className="text-white text-xl font-bold mb-3">How it works</h2>
-            <p className="text-slate-400 text-sm max-w-md leading-relaxed">
-              Our AI analyzes all your PAN card activity — the number of suspicious events,
-              types of fraud attempts, sources involved — and calculates a risk score from 0 to 100.
+        <div className="cyber-card" style={{ padding: '40px 32px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{
+              width: '80px', height: '80px', borderRadius: '50%',
+              background: 'rgba(99,102,241,0.08)', border: '2px solid rgba(99,102,241,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '36px', marginBottom: '20px',
+              boxShadow: '0 0 20px rgba(99,102,241,0.2)',
+            }}>🧠</div>
+            <h2 style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '14px', fontWeight: 900, color: '#fff', letterSpacing: '1px', marginBottom: '12px' }}>
+              HOW IT WORKS
+            </h2>
+            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '13px', color: '#2d6a4f', maxWidth: '400px', lineHeight: 1.7 }}>
+              Our AI analyzes all your PAN card activity — suspicious events, fraud types,
+              sources involved — and calculates a risk score from 0 to 100.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '32px' }}>
             {[
-              { range: '0 - 40',   label: 'LOW',      color: 'border-emerald-500 text-emerald-400' },
-              { range: '41 - 70',  label: 'MEDIUM',   color: 'border-amber-500 text-amber-400' },
-              { range: '71 - 85',  label: 'HIGH',     color: 'border-red-500 text-red-400' },
-              { range: '86 - 100', label: 'CRITICAL', color: 'border-red-700 text-red-600' },
+              { range: '0–40',   label: 'LOW',      color: '#00ff88' },
+              { range: '41–70',  label: 'MEDIUM',   color: '#f59e0b' },
+              { range: '71–85',  label: 'HIGH',     color: '#ff4444' },
+              { range: '86–100', label: 'CRITICAL', color: '#ff0000' },
             ].map(item => (
-              <div key={item.label} className={`bg-slate-800 border rounded-xl p-3 text-center ${item.color}`}>
-                <p className="font-bold text-sm">{item.label}</p>
-                <p className="text-slate-400 text-xs mt-0.5">{item.range}</p>
+              <div key={item.label} style={{
+                background: `${item.color}08`, border: `1px solid ${item.color}30`,
+                borderRadius: '10px', padding: '12px', textAlign: 'center',
+              }}>
+                <p style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: '13px', fontWeight: 700, color: item.color, letterSpacing: '0.06em' }}>{item.label}</p>
+                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '11px', color: '#1a4d2e', marginTop: '3px' }}>{item.range}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex justify-center">
-            <button
-              onClick={handleAnalyze}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-10 py-4 rounded-xl transition-colors text-base flex items-center gap-3"
-            >
-              <span>🧠</span> Analyze My Risk
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button onClick={handleAnalyze} className="btn-neon-indigo" style={{ padding: '12px 40px', borderRadius: '10px', fontSize: '15px' }}>
+              🧠 ANALYZE MY RISK
             </button>
           </div>
 
           {error && (
-            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm text-center">
-              ⚠️ {error}
+            <div style={{ marginTop: '16px', background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.3)', borderRadius: '10px', padding: '12px 16px' }}>
+              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#ff6b6b', textAlign: 'center' }}>⚠️ {error}</p>
             </div>
           )}
         </div>
       )}
 
       {loading && (
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-12 flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-          <p className="text-white font-semibold text-lg">Analyzing your risk...</p>
-          <p className="text-slate-400 text-sm mt-2">Groq AI is processing your activity pattern</p>
+        <div className="cyber-card" style={{ padding: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{
+            width: '60px', height: '60px',
+            border: '3px solid rgba(99,102,241,0.2)',
+            borderTop: '3px solid #a5b4fc',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '20px',
+            boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+          }} />
+          <p style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '14px', fontWeight: 700, color: '#fff', letterSpacing: '1px' }}>ANALYZING RISK...</p>
+          <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '12px', color: '#2d6a4f', marginTop: '8px' }}>Groq AI is processing your activity pattern</p>
         </div>
       )}
 
       {result && !loading && (
-        <div className="flex flex-col gap-6 animate-slide-in">
-
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 flex flex-col items-center">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="animate-slide-in">
+          <div className="cyber-card" style={{ padding: '32px', display: 'flex', justifyContent: 'center' }}>
             <RiskGauge score={animatedScore} level={result.level} />
           </div>
-
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
-            <h3 className="text-white font-bold text-base mb-4 flex items-center gap-2">
-              <span>🔍</span> Why this score?
+          <div className="cyber-card" style={{ padding: '24px' }}>
+            <h3 style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '12px', fontWeight: 700, color: '#00ff88', letterSpacing: '1px', marginBottom: '16px' }}>
+              🔍 WHY THIS SCORE?
             </h3>
-            <div className="flex flex-col gap-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {result.reasons.map((reason, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="w-6 h-6 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
-                    {i + 1}
-                  </span>
-                  <p className="text-slate-300 text-sm leading-relaxed">{reason}</p>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <span style={{
+                    width: '24px', height: '24px', borderRadius: '50%',
+                    background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.3)',
+                    color: '#ff6b6b', fontSize: '11px', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: "'Orbitron',sans-serif", fontWeight: 700,
+                  }}>{i + 1}</span>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '13px', color: '#52b788', lineHeight: 1.6 }}>{reason}</p>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="bg-indigo-600/10 border border-indigo-500/30 rounded-2xl p-6">
-            <h3 className="text-indigo-400 font-bold text-base mb-2 flex items-center gap-2">
-              <span>💡</span> AI Recommendation
+          <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '14px', padding: '24px' }}>
+            <h3 style={{ fontFamily: "'Orbitron',sans-serif", fontSize: '12px', fontWeight: 700, color: '#a5b4fc', letterSpacing: '1px', marginBottom: '10px' }}>
+              💡 AI RECOMMENDATION
             </h3>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              {result.recommendation}
-            </p>
+            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: '13px', color: '#818cf8', lineHeight: 1.7 }}>{result.recommendation}</p>
           </div>
-
-          <div className="flex justify-center">
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
-              onClick={handleReset}
-              className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-semibold px-8 py-3 rounded-xl transition-colors text-sm flex items-center gap-2"
-            >
-              🔄 Re-analyze
-            </button>
+              onClick={() => { setResult(null); setAnimatedScore(0); setError(null) }}
+              className="btn-ghost"
+              style={{ padding: '10px 28px', borderRadius: '10px' }}
+            >🔄 RE-ANALYZE</button>
           </div>
-
         </div>
       )}
-
     </div>
   )
 }
