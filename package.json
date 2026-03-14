@@ -1,0 +1,33 @@
+{
+  "name": "finsheild",
+  "version": "1.0.0",
+  "description": "PAN Card Fraud Detection System – FinShield",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "jest --forceExit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sai-Phani-Krishna8/Finsheild.git"
+  },
+  "keywords": ["pan-card", "fraud-detection", "fintech", "india"],
+  "author": "FinShield",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sai-Phani-Krishna8/Finsheild/issues"
+  },
+  "homepage": "https://github.com/Sai-Phani-Krishna8/Finsheild#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
+  }
+}
